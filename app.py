@@ -167,6 +167,7 @@ section = st.selectbox(
         "📊 Today's Summary",
         "🧾 Expense Entry",
         "💰 Sales Entry",
+        "👤 Employee Salary",
         "🧑‍🍳 Attendance",
         "📊 Expense Analytics",
         "📈 Attendance Analytics",
@@ -317,6 +318,94 @@ elif section == "🧾 Expense Entry":
             )
     
         st.success(f"{count} expense(s) recorded" if count else "No expenses submitted")
+
+# =================================================
+# 👤 EMPLOYEE SALARY / ADVANCE
+# =================================================
+elif section == "👤 Employee Salary":
+
+    st.markdown("## 👤 Employee Salary / Advance")
+
+    EMPLOYEES = [
+        "Vinoth","Ravi","Mani","Ansari","Kumar","Sakthi","Vijaya","Hari",
+        "Samuthuram","Ramesh","Punitha","Vembu","Babu","Latha",
+        "Indhra","Ambika","RY","YS","Poosari","Balaji"
+    ]
+
+    with st.form("salary_form"):
+
+        sal_date = st.date_input("Payment Date", value=today_date)
+        sal_time = st.time_input(
+            "Payment Time",
+            value=now.time().replace(second=0)
+        )
+
+        sal_dt = datetime.combine(sal_date, sal_time).strftime(DATETIME_FMT)
+
+        st.markdown("---")
+        st.markdown("### 💼 Salary / Advance Payments")
+
+        salary_rows = []
+
+        for emp in EMPLOYEES:
+            col1, col2, col3 = st.columns([2, 2, 2])
+
+            with col1:
+                sel = st.checkbox(emp, key=f"sal_{emp}")
+
+            with col2:
+                pay_type = st.selectbox(
+                    "Type",
+                    ["Salary", "Advance"],
+                    key=f"type_{emp}"
+                )
+
+            with col3:
+                amount = st.number_input(
+                    "Amount",
+                    min_value=0.0,
+                    step=500.0,
+                    key=f"amt_{emp}"
+                )
+
+            salary_rows.append((sel, emp, pay_type, amount))
+
+        submit = st.form_submit_button("✅ Save Salary Payments")
+
+    # ---------------- SAVE LOGIC ----------------
+    if submit:
+        count = 0
+        total_salary_paid = 0.0
+
+        for sel, emp, pay_type, amount in salary_rows:
+            if sel and amount > 0:
+                expense_sheet.append_row([
+                    sal_dt,
+                    "Salary and Advance",     # Category
+                    emp,                      # Sub-Category = Employee
+                    amount,
+                    "Cash",                   # Payment Mode (fixed)
+                    pay_type                  # Expense By reused as Type
+                ])
+
+                total_salary_paid += float(amount)
+                count += 1
+
+        # 🔁 Update Daily Balance
+        if total_salary_paid > 0:
+            upsert_daily_balance(
+                balance_sheet=balance_sheet,
+                target_date=sal_date,
+                delta_expense=total_salary_paid,
+                now_str=now_str
+            )
+
+        st.success(
+            f"✅ {count} salary / advance payment(s) recorded"
+            if count else
+            "No salary payments recorded"
+        )
+    
 
 
 # =================================================
@@ -599,6 +688,33 @@ elif section == "📊 Expense Analytics":
         st.dataframe(other_summary, use_container_width=True)
     
     st.markdown("---")
+
+    # =================================================
+    # 👤 Employee-wise Salary Paid
+    # =================================================
+    st.subheader("👤 Employee-wise Salary / Advance Paid")
+    
+    salary_df = df[df["Category"] == "Salary and Advance"]
+    
+    if salary_df.empty:
+        st.info("No salary payments recorded yet.")
+    else:
+        salary_summary = (
+            salary_df
+            .groupby("Sub-Category", as_index=False)["Expense Amount"]
+            .sum()
+            .rename(columns={
+                "Sub-Category": "Employee",
+                "Expense Amount": "Total Paid"
+            })
+            .sort_values("Total Paid", ascending=False)
+            .reset_index(drop=True)
+        )
+    
+        st.dataframe(salary_summary, use_container_width=True)
+    
+    st.markdown("---")
+
 
 
     # =================================================
@@ -1030,6 +1146,7 @@ elif section == "📊 Sales Analytics":
     ]].sort_values(["Date", "Store"],ascending=False).reset_index(drop=True)
 
     st.dataframe(final_df, use_container_width=True)
+
 
 
 
