@@ -479,7 +479,7 @@ elif section == "👤 Employee Salary":
                     emp,               # Sub-Category = Employee Name
                     amount,
                     "Cash",            # Payment Mode (fixed)
-                    "System"           # Expense By (not overloaded anymore)
+                    "RK"           # Expense By (not overloaded anymore)
                 ])
     
                 total_outflow += float(amount)
@@ -1253,6 +1253,7 @@ elif section == "📊 Sales Analytics":
     ]].sort_values(["Date", "Store"],ascending=False).reset_index(drop=True)
 
     st.dataframe(final_df, use_container_width=True)
+
 
 
 
