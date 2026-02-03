@@ -469,36 +469,37 @@ elif section == "👤 Employee Salary":
     # ---------------- SAVE LOGIC ----------------
     if submit:
         count = 0
-        total_salary_paid = 0.0
-
+        total_outflow = 0.0
+    
         for sel, emp, pay_type, amount in salary_rows:
             if sel and amount > 0:
                 expense_sheet.append_row([
                     sal_dt,
-                    "Salary and Advance",     # Category
-                    emp,                      # Sub-Category = Employee
+                    pay_type,          # ✅ Category = "Salary" OR "Advance"
+                    emp,               # Sub-Category = Employee Name
                     amount,
-                    "Cash",                   # Payment Mode (fixed)
-                    pay_type                  # Expense By reused as Type
+                    "Cash",            # Payment Mode (fixed)
+                    "System"           # Expense By (not overloaded anymore)
                 ])
-
-                total_salary_paid += float(amount)
+    
+                total_outflow += float(amount)
                 count += 1
-
-        # 🔁 Update Daily Balance
-        if total_salary_paid > 0:
+    
+        # 🔁 Update Daily Balance (cash goes out)
+        if total_outflow > 0:
             upsert_daily_balance(
                 balance_sheet=balance_sheet,
                 target_date=sal_date,
-                delta_expense=total_salary_paid,
+                delta_expense=total_outflow,
                 now_str=now_str
             )
-
+    
         st.success(
             f"✅ {count} salary / advance payment(s) recorded"
             if count else
             "No salary payments recorded"
         )
+
     
 
 
@@ -1252,6 +1253,7 @@ elif section == "📊 Sales Analytics":
     ]].sort_values(["Date", "Store"],ascending=False).reset_index(drop=True)
 
     st.dataframe(final_df, use_container_width=True)
+
 
 
 
