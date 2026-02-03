@@ -682,7 +682,7 @@ elif section == "🧑‍🍳 Attendance":
 
 
 # =================================================
-# 📊 EXPENSE ANALYTICS (TABLE-ONLY + KPIs)
+# 📊 EXPENSE ANALYTICS (KPIs + SAVINGS)
 # =================================================
 elif section == "📊 Expense Analytics":
 
@@ -700,13 +700,12 @@ elif section == "📊 Expense Analytics":
 
     df["datetime"] = pd.to_datetime(
         df["Date & Time"],
-        format=DATETIME_FMT,      # DD/MM/YYYY HH:MM
+        format=DATETIME_FMT,
         errors="coerce"
     )
 
     df = df.dropna(subset=["datetime", "Expense Amount"])
 
-    # 🔑 Normalize once — reuse everywhere
     df["date"] = df["datetime"].dt.date
     df["year"] = df["datetime"].dt.year
     df["month"] = df["datetime"].dt.month
@@ -717,35 +716,51 @@ elif section == "📊 Expense Analytics":
     current_week = now.isocalendar().week
 
     # =================================================
-    # 📌 EXPENSE KPI SUMMARY
+    # 🔑 SPLIT EXPENSES vs SAVINGS
     # =================================================
-    overall_expense = df["Expense Amount"].sum()
+    df_expense = df[df["Category"] != "Savings"].copy()
+    df_savings = df[df["Category"] == "Savings"].copy()
 
-    monthly_expense = df[
-        (df["year"] == current_year) &
-        (df["month"] == current_month)
+    # =================================================
+    # 📌 KPI SUMMARY (EXPENSE ONLY)
+    # =================================================
+    overall_expense = df_expense["Expense Amount"].sum()
+
+    monthly_expense = df_expense[
+        (df_expense["year"] == current_year) &
+        (df_expense["month"] == current_month)
     ]["Expense Amount"].sum()
 
-    weekly_expense = df[
-        (df["year"] == current_year) &
-        (df["week"] == current_week)
+    weekly_expense = df_expense[
+        (df_expense["year"] == current_year) &
+        (df_expense["week"] == current_week)
     ]["Expense Amount"].sum()
 
-    col1, col2, col3 = st.columns(3)
+    # =================================================
+    # 💾 SAVINGS KPI
+    # =================================================
+    monthly_savings = df_savings[
+        (df_savings["year"] == current_year) &
+        (df_savings["month"] == current_month)
+    ]["Expense Amount"].sum()
+
+    col1, col2, col3, col4 = st.columns(4)
 
     col1.metric("💸 Overall Expenses", f"₹ {overall_expense:,.0f}")
     col2.metric("📅 Expenses (This Month)", f"₹ {monthly_expense:,.0f}")
     col3.metric("🗓️ Expenses (This Week)", f"₹ {weekly_expense:,.0f}")
+    col4.metric("💾 Savings (This Month)", f"₹ {monthly_savings:,.0f}")
 
     st.markdown("---")
 
     # =================================================
-    # 1️⃣ Category-wise Expense
+    # 1️⃣ Category-wise Expense (NO SAVINGS)
     # =================================================
     st.subheader("📂 Category-wise Expense")
 
     cat_expense = (
-        df.groupby("Category", as_index=False)["Expense Amount"]
+        df_expense
+        .groupby("Category", as_index=False)["Expense Amount"]
         .sum()
         .sort_values("Expense Amount", ascending=False)
         .reset_index(drop=True)
@@ -757,20 +772,19 @@ elif section == "📊 Expense Analytics":
     # 🧾 Other Expenses – Sub-Category Breakdown
     # =================================================
     st.subheader("🧾 Other Expenses Breakdown")
-    
-    other_df = df[df["Category"] == "Others"].copy()
-    
+
+    other_df = df_expense[df_expense["Category"] == "Others"].copy()
+
     if other_df.empty:
         st.info("No 'Other' expenses recorded yet.")
     else:
-        # 🔑 Normalize missing sub-categories
         other_df["Sub-Category"] = (
             other_df["Sub-Category"]
             .fillna("")
             .str.strip()
             .replace("", "Miscellaneous Expenses")
         )
-    
+
         other_summary = (
             other_df
             .groupby("Sub-Category", as_index=False)["Expense Amount"]
@@ -778,18 +792,18 @@ elif section == "📊 Expense Analytics":
             .sort_values("Expense Amount", ascending=False)
             .reset_index(drop=True)
         )
-    
+
         st.dataframe(other_summary, use_container_width=True)
-    
+
     st.markdown("---")
 
     # =================================================
-    # 👤 Employee-wise Salary Paid
+    # 👤 Employee-wise Salary / Advance
     # =================================================
     st.subheader("👤 Employee-wise Salary / Advance Paid")
-    
-    salary_df = df[df["Category"] == "Salary and Advance"]
-    
+
+    salary_df = df_expense[df_expense["Category"] == "Salary and Advance"]
+
     if salary_df.empty:
         st.info("No salary payments recorded yet.")
     else:
@@ -804,32 +818,28 @@ elif section == "📊 Expense Analytics":
             .sort_values("Total Paid", ascending=False)
             .reset_index(drop=True)
         )
-    
+
         st.dataframe(salary_summary, use_container_width=True)
-    
+
     st.markdown("---")
 
-
-
     # =================================================
-    # 2️⃣ Expense Trend (CURRENT MONTH ONLY)
+    # 2️⃣ Expense Trend (CURRENT MONTH ONLY – NO SAVINGS)
     # =================================================
     st.subheader("📈 Expense Trend (Current Month)")
-    
+
     trend = st.radio(
         "Trend Type",
         ["Daily", "Weekly", "Monthly"],
         horizontal=True
     )
-    
-    # Filter once — reuse everywhere
-    month_df = df[
-        (df["year"] == current_year) &
-        (df["month"] == current_month)
+
+    month_df = df_expense[
+        (df_expense["year"] == current_year) &
+        (df_expense["month"] == current_month)
     ]
-    
+
     if trend == "Daily":
-        # ✅ Daily expenses — CURRENT MONTH ONLY
         trend_df = (
             month_df
             .groupby("date", as_index=False)["Expense Amount"]
@@ -838,13 +848,12 @@ elif section == "📊 Expense Analytics":
             .sort_values("Date", ascending=False)
             .reset_index(drop=True)
         )
-    
+
         trend_df["Date"] = trend_df["Date"].apply(
             lambda x: x.strftime(DATE_FMT)
         )
-    
+
     elif trend == "Weekly":
-        # ✅ Weekly expenses — CURRENT MONTH ONLY (ISO week)
         trend_df = (
             month_df
             .groupby("week", as_index=False)["Expense Amount"]
@@ -853,27 +862,29 @@ elif section == "📊 Expense Analytics":
             .sort_values("Week (ISO)", ascending=False)
             .reset_index(drop=True)
         )
-    
-    else:  # Monthly
-        # ✅ Monthly trend — YEAR-WISE (this one is okay to be broader)
+
+    else:
         trend_df = (
-            df.groupby(["year", "month"], as_index=False)["Expense Amount"]
+            df_expense
+            .groupby(["year", "month"], as_index=False)["Expense Amount"]
             .sum()
             .rename(columns={"month": "Month"})
             .sort_values(["year", "Month"], ascending=False)
             .reset_index(drop=True)
         )
-    
+
     st.dataframe(trend_df, use_container_width=True)
+
     st.markdown("---")
 
     # =================================================
-    # 3️⃣ Payment Mode-wise Expense
+    # 3️⃣ Payment Mode-wise Expense (NO SAVINGS)
     # =================================================
     st.subheader("💳 Payment Mode")
 
     payment_df = (
-        df.groupby("Payment Mode", as_index=False)["Expense Amount"]
+        df_expense
+        .groupby("Payment Mode", as_index=False)["Expense Amount"]
         .sum()
         .sort_values("Expense Amount", ascending=False)
         .reset_index(drop=True)
@@ -884,12 +895,13 @@ elif section == "📊 Expense Analytics":
     st.markdown("---")
 
     # =================================================
-    # 4️⃣ Expense By
+    # 4️⃣ Expense By (NO SAVINGS)
     # =================================================
     st.subheader("👤 Expense By")
 
     by_df = (
-        df.groupby("Expense By", as_index=False)["Expense Amount"]
+        df_expense
+        .groupby("Expense By", as_index=False)["Expense Amount"]
         .sum()
         .sort_values("Expense Amount", ascending=False)
         .reset_index(drop=True)
@@ -1240,6 +1252,7 @@ elif section == "📊 Sales Analytics":
     ]].sort_values(["Date", "Store"],ascending=False).reset_index(drop=True)
 
     st.dataframe(final_df, use_container_width=True)
+
 
 
 
