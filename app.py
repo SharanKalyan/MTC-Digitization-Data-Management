@@ -266,7 +266,7 @@ if section == "📊 Today's Summary":
 
 
 # =================================================
-# 🧾 EXPENSE ENTRY (BULK)
+# 🧾 EXPENSE ENTRY (BULK + SAVINGS)
 # =================================================
 elif section == "🧾 Expense Entry":
 
@@ -279,36 +279,106 @@ elif section == "🧾 Expense Entry":
     ]
 
     with st.form("expense_form"):
+
+        # ---------- DATE & TIME ----------
         exp_date = st.date_input("Expense Date", value=today_date)
-        exp_time = st.time_input("Expense Time", value=now.time().replace(second=0))
+        exp_time = st.time_input(
+            "Expense Time",
+            value=now.time().replace(second=0)
+        )
         exp_dt = datetime.combine(exp_date, exp_time).strftime(DATETIME_FMT)
+
         st.markdown("---")
+
+        # =================================================
+        # 💸 NORMAL EXPENSES
+        # =================================================
+        st.subheader("💸 Expenses")
 
         expense_rows = []
 
         for cat in EXPENSE_CATEGORIES:
             sel = st.checkbox(cat, key=f"sel_{cat}")
-            sub = st.text_input("Sub-category", key=f"sub_{cat}")
-            amt = st.number_input("Amount", min_value=0, key=f"amt_{cat}")
-            pay = st.selectbox("Payment", ["Cash","UPI","Cheque"], key=f"pay_{cat}")
-            by = st.selectbox("Expense By", ["RK","AR","YS"], key=f"by_{cat}")
+            sub = st.text_input(
+                "Sub-category",
+                key=f"sub_{cat}",
+                placeholder="Optional"
+            )
+            amt = st.number_input(
+                "Amount",
+                min_value=0,
+                key=f"amt_{cat}"
+            )
+            pay = st.selectbox(
+                "Payment",
+                ["Cash","UPI","Cheque"],
+                key=f"pay_{cat}"
+            )
+            by = st.selectbox(
+                "Expense By",
+                ["RK","AR","YS"],
+                key=f"by_{cat}"
+            )
+
             expense_rows.append((sel, cat, sub, amt, pay, by))
             st.markdown("---")
 
+        # =================================================
+        # 💾 SAVINGS (SEPARATE SECTION)
+        # =================================================
+        st.subheader("💾 Savings")
+
+        save_sel = st.checkbox("Add Savings Entry")
+
+        save_sub = st.text_input(
+            "Savings Note",
+            placeholder="Bank deposit, RD, Emergency fund"
+        )
+
+        save_amt = st.number_input(
+            "Savings Amount",
+            min_value=0.0,
+            step=500.0
+        )
+
+        save_pay = st.selectbox(
+            "Payment Mode",
+            ["Cash","UPI","Cheque"],
+            key="save_pay"
+        )
+
+        save_by = st.selectbox(
+            "Saved By",
+            ["RK","AR","YS"],
+            key="save_by"
+        )
+
+        # ---------- SUBMIT ----------
         submit = st.form_submit_button("✅ Submit")
 
+    # =================================================
+    # 💾 SAVE LOGIC
+    # =================================================
     if submit:
+
         count = 0
         total_expense_added = 0.0
 
+        # ---------- NORMAL EXPENSE SAVE ----------
         for sel, cat, sub, amt, pay, by in expense_rows:
             if sel and amt > 0:
                 expense_sheet.append_row([
-                    exp_dt, cat, sub, amt, pay, by
+                    exp_dt,
+                    cat,
+                    sub,
+                    amt,
+                    pay,
+                    by
                 ])
                 total_expense_added += float(amt)
                 count += 1
-    
+
+        # ---------- UPDATE DAILY BALANCE (EXPENSE) ----------
         if total_expense_added > 0:
             upsert_daily_balance(
                 balance_sheet=balance_sheet,
@@ -316,8 +386,32 @@ elif section == "🧾 Expense Entry":
                 delta_expense=total_expense_added,
                 now_str=now_str
             )
-    
-        st.success(f"{count} expense(s) recorded" if count else "No expenses submitted")
+
+        # ---------- SAVINGS SAVE ----------
+        if save_sel and save_amt > 0:
+            expense_sheet.append_row([
+                exp_dt,
+                "Savings",         # Category
+                save_sub,
+                save_amt,
+                save_pay,
+                save_by
+            ])
+
+            # Savings reduces cash but is NOT an expense
+            upsert_daily_balance(
+                balance_sheet=balance_sheet,
+                target_date=exp_date,
+                delta_expense=0.0,
+                now_str=now_str
+            )
+
+        # ---------- UI MESSAGE ----------
+        if count or (save_sel and save_amt > 0):
+            st.success("Entries saved successfully ✅")
+        else:
+            st.info("No expense or savings entered")
+
 
 # =================================================
 # 👤 EMPLOYEE SALARY / ADVANCE
@@ -1146,6 +1240,7 @@ elif section == "📊 Sales Analytics":
     ]].sort_values(["Date", "Store"],ascending=False).reset_index(drop=True)
 
     st.dataframe(final_df, use_container_width=True)
+
 
 
 
