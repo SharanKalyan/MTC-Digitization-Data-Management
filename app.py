@@ -1308,42 +1308,85 @@ elif section == "📊 Sales Analytics":
 
     st.dataframe(final_df, use_container_width=True)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    # =================================================
+    # 3️⃣ MONTHLY SALES vs EXPENSE vs PROFIT / LOSS
+    # =================================================
+    st.markdown("---")
+    st.subheader("📆 Monthly Sales / Expense / Profit")
+    
+    # ---------- SALES (Monthly) ----------
+    monthly_sales_all = (
+        df.groupby(["year", "month"], as_index=False)["Cash Total"]
+        .sum()
+        .rename(columns={"Cash Total": "Sales"})
+    )
+    
+    # ---------- EXPENSES (Monthly) ----------
+    expense_df_all = pd.DataFrame(expense_sheet.get_all_records())
+    
+    if not expense_df_all.empty:
+        expense_df_all["Expense Amount"] = pd.to_numeric(
+            expense_df_all["Expense Amount"], errors="coerce"
+        )
+    
+        expense_df_all["datetime"] = pd.to_datetime(
+            expense_df_all["Date & Time"],
+            format=DATETIME_FMT,
+            errors="coerce"
+        )
+    
+        expense_df_all = expense_df_all.dropna(
+            subset=["datetime", "Expense Amount"]
+        )
+    
+        expense_df_all["year"] = expense_df_all["datetime"].dt.year
+        expense_df_all["month"] = expense_df_all["datetime"].dt.month
+    
+        # ❗ EXCLUDE SAVINGS
+        expense_df_all = expense_df_all[
+            expense_df_all["Category"] != "Savings"
+        ]
+    
+        monthly_expense_all = (
+            expense_df_all
+            .groupby(["year", "month"], as_index=False)["Expense Amount"]
+            .sum()
+            .rename(columns={"Expense Amount": "Expense"})
+        )
+    else:
+        monthly_expense_all = pd.DataFrame(
+            columns=["year", "month", "Expense"]
+        )
+    
+    # ---------- MERGE SALES + EXPENSE ----------
+    monthly_pl = (
+        monthly_sales_all
+        .merge(
+            monthly_expense_all,
+            on=["year", "month"],
+            how="left"
+        )
+    )
+    
+    monthly_pl["Expense"] = monthly_pl["Expense"].fillna(0)
+    monthly_pl["Profit / Loss"] = (
+        monthly_pl["Sales"] - monthly_pl["Expense"]
+    )
+    
+    # ---------- FORMAT YEAR / MONTH ----------
+    monthly_pl["Year / Month"] = monthly_pl.apply(
+        lambda x: f"{int(x['year'])}-{int(x['month']):02d}",
+        axis=1
+    )
+    
+    monthly_pl = monthly_pl[[
+        "Year / Month",
+        "Sales",
+        "Expense",
+        "Profit / Loss"
+    ]].sort_values(
+        "Year / Month",
+        ascending=False
+    ).reset_index(drop=True)
+    
+    st.dataframe(monthly_pl, use_container_width=True)
