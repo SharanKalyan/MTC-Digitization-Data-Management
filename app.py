@@ -272,10 +272,23 @@ elif section == "🧾 Expense Entry":
 
     st.markdown("## 🧾 Expense Entry")
 
-    EXPENSE_CATEGORIES = [
-        "Groceries","Vegetables","Gas","Oil & Ghee","Non-Veg",
-        "Milk","Banana Leaf","Maintenance","Electricity",
-        "Rent","Salary and Advance","Transportation","Others"
+    TOP_CATEGORIES = [
+        "Vegetables",
+        "Banana Leaf",
+        "Milk",
+        "Gas",
+        "Groceries",
+        "Others"
+    ]
+
+    OTHER_CATEGORIES = [
+        "Oil & Ghee",
+        "Non-Veg",
+        "Maintenance",
+        "Electricity",
+        "Rent",
+        "Salary and Advance",
+        "Transportation"
     ]
 
     with st.form("expense_form"):
@@ -290,14 +303,14 @@ elif section == "🧾 Expense Entry":
 
         st.markdown("---")
 
-        # =================================================
-        # 💸 NORMAL EXPENSES
-        # =================================================
-        st.subheader("💸 Expenses")
-
         expense_rows = []
 
-        for cat in EXPENSE_CATEGORIES:
+        # =================================================
+        # ⭐ MOST USED CATEGORIES (ALWAYS VISIBLE)
+        # =================================================
+        st.subheader("⭐ Common Expenses")
+
+        for cat in TOP_CATEGORIES:
             sel = st.checkbox(cat, key=f"sel_{cat}")
             sub = st.text_input(
                 "Sub-category",
@@ -311,12 +324,12 @@ elif section == "🧾 Expense Entry":
             )
             pay = st.selectbox(
                 "Payment",
-                ["Cash","UPI","Cheque"],
+                ["Cash", "UPI", "Cheque"],
                 key=f"pay_{cat}"
             )
             by = st.selectbox(
                 "Expense By",
-                ["RK","AR","YS"],
+                ["RK", "AR", "YS"],
                 key=f"by_{cat}"
             )
 
@@ -324,7 +337,38 @@ elif section == "🧾 Expense Entry":
             st.markdown("---")
 
         # =================================================
-        # 💾 SAVINGS (SEPARATE SECTION)
+        # 📦 OTHER CATEGORIES (EXPANDABLE)
+        # =================================================
+        with st.expander("📦 Other Expense Categories"):
+
+            for cat in OTHER_CATEGORIES:
+                sel = st.checkbox(cat, key=f"sel_{cat}")
+                sub = st.text_input(
+                    "Sub-category",
+                    key=f"sub_{cat}",
+                    placeholder="Optional"
+                )
+                amt = st.number_input(
+                    "Amount",
+                    min_value=0,
+                    key=f"amt_{cat}"
+                )
+                pay = st.selectbox(
+                    "Payment",
+                    ["Cash", "UPI", "Cheque"],
+                    key=f"pay_{cat}"
+                )
+                by = st.selectbox(
+                    "Expense By",
+                    ["RK", "AR", "YS"],
+                    key=f"by_{cat}"
+                )
+
+                expense_rows.append((sel, cat, sub, amt, pay, by))
+                st.markdown("---")
+
+        # =================================================
+        # 💾 SAVINGS (SEPARATE & CLEAR)
         # =================================================
         st.subheader("💾 Savings")
 
@@ -343,13 +387,13 @@ elif section == "🧾 Expense Entry":
 
         save_pay = st.selectbox(
             "Payment Mode",
-            ["Cash","UPI","Cheque"],
+            ["Cash", "UPI", "Cheque"],
             key="save_pay"
         )
 
         save_by = st.selectbox(
             "Saved By",
-            ["RK","AR","YS"],
+            ["RK", "AR", "YS"],
             key="save_by"
         )
 
@@ -364,7 +408,7 @@ elif section == "🧾 Expense Entry":
         count = 0
         total_expense_added = 0.0
 
-        # ---------- NORMAL EXPENSE SAVE ----------
+        # ---------- NORMAL EXPENSES ----------
         for sel, cat, sub, amt, pay, by in expense_rows:
             if sel and amt > 0:
                 expense_sheet.append_row([
@@ -378,7 +422,6 @@ elif section == "🧾 Expense Entry":
                 total_expense_added += float(amt)
                 count += 1
 
-        # ---------- UPDATE DAILY BALANCE (EXPENSE) ----------
         if total_expense_added > 0:
             upsert_daily_balance(
                 balance_sheet=balance_sheet,
@@ -387,11 +430,11 @@ elif section == "🧾 Expense Entry":
                 now_str=now_str
             )
 
-        # ---------- SAVINGS SAVE ----------
+        # ---------- SAVINGS ----------
         if save_sel and save_amt > 0:
             expense_sheet.append_row([
                 exp_dt,
-                "Savings",         # Category
+                "Savings",
                 save_sub,
                 save_amt,
                 save_pay,
@@ -406,11 +449,11 @@ elif section == "🧾 Expense Entry":
                 now_str=now_str
             )
 
-        # ---------- UI MESSAGE ----------
         if count or (save_sel and save_amt > 0):
             st.success("Entries saved successfully ✅")
         else:
             st.info("No expense or savings entered")
+
 
 
 # =================================================
@@ -1264,6 +1307,7 @@ elif section == "📊 Sales Analytics":
     ]].sort_values(["Date", "Store"],ascending=False).reset_index(drop=True)
 
     st.dataframe(final_df, use_container_width=True)
+
 
 
 
