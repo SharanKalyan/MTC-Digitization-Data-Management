@@ -810,6 +810,7 @@ elif section == "📊 Expense Analytics":
         .reset_index(drop=True)
     )
 
+    ## This is count of expenses. unhash if needed. 
     cat_expense_counts = (
     df_expense
     .groupby("Category")
@@ -819,10 +820,9 @@ elif section == "📊 Expense Analytics":
     )
 
     st.dataframe(cat_expense, use_container_width=True)
-
-    st.markdown("---")
-
-    st.dataframe(cat_expense_counts,use_container_width=True) 
+    #st.markdown("---")
+    #st.dataframe(cat_expense_counts,use_container_width=True) 
+    
     # =================================================
     # 🧾 Other Expenses – Sub-Category Breakdown
     # =================================================
@@ -1307,6 +1307,7 @@ elif section == "📊 Sales Analytics":
     ]].sort_values(["Date", "Store"],ascending=False).reset_index(drop=True)
 
     st.dataframe(final_df, use_container_width=True)
+
 
 
 
