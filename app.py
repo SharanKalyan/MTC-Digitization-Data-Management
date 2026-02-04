@@ -767,12 +767,12 @@ elif section == "📊 Expense Analytics":
         .reset_index(drop=True)
     )
 
-     cat_expense_counts = (
-        df_expense
-        .groupby("Category", as_index=False)["Expense Amount"]
-        .count()
-        .sort_values("Expense Amount", ascending=False)
-        .reset_index(drop=True)
+    cat_expense_counts = (
+    df_expense
+    .groupby("Category")
+    .size()
+    .reset_index(name="No. of Entries")
+    .sort_values("No. of Entries", ascending=False)
     )
 
     st.dataframe(cat_expense, use_container_width=True)
@@ -1264,6 +1264,7 @@ elif section == "📊 Sales Analytics":
     ]].sort_values(["Date", "Store"],ascending=False).reset_index(drop=True)
 
     st.dataframe(final_df, use_container_width=True)
+
 
 
 
