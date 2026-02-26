@@ -544,8 +544,6 @@ elif section == "👤 Employee Salary":
         )
 
     
-
-
 # =================================================
 # 💰 SALES ENTRY (BULK – FIXED STRUCTURE)
 # =================================================
@@ -724,7 +722,6 @@ elif section == "🧑‍🍳 Attendance":
 
         st.success("Attendance saved ✅")
 
-
 # =================================================
 # 📊 EXPENSE ANALYTICS (KPIs + SAVINGS)
 # =================================================
@@ -755,50 +752,58 @@ elif section == "📊 Expense Analytics":
     df["month"] = df["datetime"].dt.month
     df["week"] = df["datetime"].dt.isocalendar().week
 
-    current_year = now.year
-    current_month = now.month
-    current_week = now.isocalendar().week
+    # =================================================
+    # 📅 MONTH-YEAR FILTER (MAIN CONTROL)
+    # =================================================
+    st.markdown("### 📅 Select Month")
+
+    df["month_year"] = df["datetime"].dt.to_period("M")
+
+    available_months = sorted(
+        df["month_year"].unique(),
+        reverse=True
+    )
+
+    selected_month = st.selectbox(
+        "Select Month-Year",
+        available_months,
+        format_func=lambda x: x.strftime("%B %Y")
+    )
+
+    filtered_df = df[df["month_year"] == selected_month].copy()
+
+    if filtered_df.empty:
+        st.warning("No data available for selected month.")
+        st.stop()
 
     # =================================================
     # 🔑 SPLIT EXPENSES vs SAVINGS
     # =================================================
-    df_expense = df[df["Category"] != "Savings"].copy()
-    df_savings = df[df["Category"] == "Savings"].copy()
+    df_expense = filtered_df[filtered_df["Category"] != "Savings"].copy()
+    df_savings = filtered_df[filtered_df["Category"] == "Savings"].copy()
 
     # =================================================
-    # 📌 KPI SUMMARY (EXPENSE ONLY)
+    # 📌 KPI SUMMARY
     # =================================================
     overall_expense = df_expense["Expense Amount"].sum()
 
-    monthly_expense = df_expense[
-        (df_expense["year"] == current_year) &
-        (df_expense["month"] == current_month)
-    ]["Expense Amount"].sum()
-
     weekly_expense = df_expense[
-        (df_expense["year"] == current_year) &
-        (df_expense["week"] == current_week)
+        df_expense["week"] == df_expense["week"].max()
     ]["Expense Amount"].sum()
 
-    # =================================================
-    # 💾 SAVINGS KPI
-    # =================================================
-    monthly_savings = df_savings[
-        (df_savings["year"] == current_year) &
-        (df_savings["month"] == current_month)
-    ]["Expense Amount"].sum()
+    monthly_savings = df_savings["Expense Amount"].sum()
 
     col1, col2, col3, col4 = st.columns(4)
 
-    col1.metric("💸 Overall Expenses", f"₹ {overall_expense:,.0f}")
-    col2.metric("📅 Expenses (This Month)", f"₹ {monthly_expense:,.0f}")
-    col3.metric("🗓️ Expenses (This Week)", f"₹ {weekly_expense:,.0f}")
-    col4.metric("💾 Savings (This Month)", f"₹ {monthly_savings:,.0f}")
+    col1.metric("💸 Total Expenses (Selected Month)", f"₹ {overall_expense:,.0f}")
+    col2.metric("🗓️ Latest Week Expense", f"₹ {weekly_expense:,.0f}")
+    col3.metric("💾 Savings (Selected Month)", f"₹ {monthly_savings:,.0f}")
+    col4.metric("📊 No. of Entries", len(filtered_df))
 
     st.markdown("---")
 
     # =================================================
-    # 1️⃣ Category-wise Expense (NO SAVINGS)
+    # 1️⃣ Category-wise Expense
     # =================================================
     st.subheader("📂 Category-wise Expense")
 
@@ -810,28 +815,19 @@ elif section == "📊 Expense Analytics":
         .reset_index(drop=True)
     )
 
-    ## This is count of expenses. unhash if needed. 
-    cat_expense_counts = (
-    df_expense
-    .groupby("Category")
-    .size()
-    .reset_index(name="No. of Entries")
-    .sort_values("No. of Entries", ascending=False)
-    )
-
     st.dataframe(cat_expense, use_container_width=True)
-    #st.markdown("---")
-    #st.dataframe(cat_expense_counts,use_container_width=True) 
-    
+
+    st.markdown("---")
+
     # =================================================
-    # 🧾 Other Expenses – Sub-Category Breakdown
+    # 🧾 Other Expenses Breakdown
     # =================================================
     st.subheader("🧾 Other Expenses Breakdown")
 
     other_df = df_expense[df_expense["Category"] == "Others"].copy()
 
     if other_df.empty:
-        st.info("No 'Other' expenses recorded yet.")
+        st.info("No 'Other' expenses recorded.")
     else:
         other_df["Sub-Category"] = (
             other_df["Sub-Category"]
@@ -860,7 +856,7 @@ elif section == "📊 Expense Analytics":
     salary_df = df_expense[df_expense["Category"] == "Salary and Advance"]
 
     if salary_df.empty:
-        st.info("No salary payments recorded yet.")
+        st.info("No salary payments recorded.")
     else:
         salary_summary = (
             salary_df
@@ -879,53 +875,32 @@ elif section == "📊 Expense Analytics":
     st.markdown("---")
 
     # =================================================
-    # 2️⃣ Expense Trend (CURRENT MONTH ONLY – NO SAVINGS)
+    # 2️⃣ Expense Trend (Within Selected Month)
     # =================================================
-    st.subheader("📈 Expense Trend (Current Month)")
+    st.subheader("📈 Expense Trend")
 
     trend = st.radio(
         "Trend Type",
-        ["Daily", "Weekly", "Monthly"],
+        ["Daily", "Weekly"],
         horizontal=True
     )
 
-    month_df = df_expense[
-        (df_expense["year"] == current_year) &
-        (df_expense["month"] == current_month)
-    ]
-
     if trend == "Daily":
         trend_df = (
-            month_df
+            df_expense
             .groupby("date", as_index=False)["Expense Amount"]
             .sum()
-            .rename(columns={"date": "Date"})
-            .sort_values("Date", ascending=False)
-            .reset_index(drop=True)
+            .sort_values("date", ascending=False)
         )
 
-        trend_df["Date"] = trend_df["Date"].apply(
-            lambda x: x.strftime(DATE_FMT)
-        )
-
-    elif trend == "Weekly":
-        trend_df = (
-            month_df
-            .groupby("week", as_index=False)["Expense Amount"]
-            .sum()
-            .rename(columns={"week": "Week (ISO)"})
-            .sort_values("Week (ISO)", ascending=False)
-            .reset_index(drop=True)
-        )
+        trend_df["date"] = trend_df["date"].astype(str)
 
     else:
         trend_df = (
             df_expense
-            .groupby(["year", "month"], as_index=False)["Expense Amount"]
+            .groupby("week", as_index=False)["Expense Amount"]
             .sum()
-            .rename(columns={"month": "Month"})
-            .sort_values(["year", "Month"], ascending=False)
-            .reset_index(drop=True)
+            .sort_values("week", ascending=False)
         )
 
     st.dataframe(trend_df, use_container_width=True)
@@ -933,7 +908,7 @@ elif section == "📊 Expense Analytics":
     st.markdown("---")
 
     # =================================================
-    # 3️⃣ Payment Mode-wise Expense (NO SAVINGS)
+    # 3️⃣ Payment Mode-wise Expense
     # =================================================
     st.subheader("💳 Payment Mode")
 
@@ -950,7 +925,7 @@ elif section == "📊 Expense Analytics":
     st.markdown("---")
 
     # =================================================
-    # 4️⃣ Expense By (NO SAVINGS)
+    # 4️⃣ Expense By
     # =================================================
     st.subheader("👤 Expense By")
 
@@ -963,6 +938,40 @@ elif section == "📊 Expense Analytics":
     )
 
     st.dataframe(by_df, use_container_width=True)
+
+    st.markdown("---")
+
+    # =================================================
+    # 📅 DATE-WISE EXPENSE DETAILS (BOTTOM SECTION)
+    # =================================================
+    st.subheader("📅 Expense Details By Date")
+
+    available_dates = sorted(
+        filtered_df["date"].unique(),
+        reverse=True
+    )
+
+    selected_date = st.selectbox(
+        "Select Date",
+        available_dates,
+        format_func=lambda x: x.strftime("%d %B %Y")
+    )
+
+    day_df = filtered_df[filtered_df["date"] == selected_date]
+
+    if day_df.empty:
+        st.info("No expenses recorded on this date.")
+    else:
+        display_df = day_df[[
+            "Date & Time",
+            "Category",
+            "Sub-Category",
+            "Expense Amount",
+            "Payment Mode",
+            "Expense By"
+        ]].sort_values("Date & Time", ascending=False)
+
+        st.dataframe(display_df, use_container_width=True)
 
 
 
@@ -1390,3 +1399,4 @@ elif section == "📊 Sales Analytics":
     ).reset_index(drop=True)
     
     st.dataframe(monthly_pl, use_container_width=True)
+
