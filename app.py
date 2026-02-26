@@ -1148,7 +1148,7 @@ elif section == "📊 Sales Analytics":
 
     df["date"] = pd.to_datetime(
         df["Date"],
-        format=DATE_FMT,       # DD/MM/YYYY
+        format=DATE_FMT,
         errors="coerce"
     )
 
@@ -1157,21 +1157,36 @@ elif section == "📊 Sales Analytics":
     df["year"] = df["date"].dt.year
     df["month"] = df["date"].dt.month
     df["date_only"] = df["date"].dt.date
-
-    current_year = now.year
-    current_month = now.month
+    df["month_year"] = df["date"].dt.to_period("M")
 
     # =================================================
-    # 📌 MONTHLY KPI SUMMARY
+    # 📅 MONTH-YEAR FILTER (MAIN CONTROL)
     # =================================================
-    monthly_sales_df = df[
-        (df["year"] == current_year) &
-        (df["month"] == current_month)
-    ]
+    st.markdown("### 📅 Select Month")
 
-    monthly_sales = monthly_sales_df["Cash Total"].sum()
+    available_months = sorted(
+        df["month_year"].unique(),
+        reverse=True
+    )
 
-    # ---------- Monthly Expenses ----------
+    selected_month = st.selectbox(
+        "Select Month-Year",
+        available_months,
+        format_func=lambda x: x.strftime("%B %Y")
+    )
+
+    filtered_df = df[df["month_year"] == selected_month].copy()
+
+    if filtered_df.empty:
+        st.warning("No sales data available for selected month.")
+        st.stop()
+
+    # =================================================
+    # 📌 MONTHLY KPI SUMMARY (SELECTED MONTH)
+    # =================================================
+    monthly_sales = filtered_df["Cash Total"].sum()
+
+    # ---------- Monthly Expenses (Selected Month) ----------
     expense_df = pd.DataFrame(expense_sheet.get_all_records())
 
     if not expense_df.empty:
@@ -1185,13 +1200,19 @@ elif section == "📊 Sales Analytics":
             errors="coerce"
         )
 
-        expense_df = expense_df.dropna(subset=["datetime", "Expense Amount"])
-        expense_df["year"] = expense_df["datetime"].dt.year
-        expense_df["month"] = expense_df["datetime"].dt.month
+        expense_df = expense_df.dropna(
+            subset=["datetime", "Expense Amount"]
+        )
+
+        expense_df["month_year"] = expense_df["datetime"].dt.to_period("M")
+
+        # ❗ EXCLUDE SAVINGS
+        expense_df = expense_df[
+            expense_df["Category"] != "Savings"
+        ]
 
         monthly_expense = expense_df[
-            (expense_df["year"] == current_year) &
-            (expense_df["month"] == current_month)
+            expense_df["month_year"] == selected_month
         ]["Expense Amount"].sum()
     else:
         monthly_expense = 0.0
@@ -1199,14 +1220,14 @@ elif section == "📊 Sales Analytics":
     monthly_profit = monthly_sales - monthly_expense
 
     col1, col2, col3 = st.columns(3)
-    col1.metric("💰 Total Sales (This Month)", f"₹ {monthly_sales:,.0f}")
-    col2.metric("💸 Total Expenses (This Month)", f"₹ {monthly_expense:,.0f}")
-    col3.metric("📈 Profit / Loss (This Month)", f"₹ {monthly_profit:,.0f}")
+    col1.metric("💰 Total Sales", f"₹ {monthly_sales:,.0f}")
+    col2.metric("💸 Total Expenses", f"₹ {monthly_expense:,.0f}")
+    col3.metric("📈 Profit / Loss", f"₹ {monthly_profit:,.0f}")
 
     st.markdown("---")
 
     # =================================================
-    # 1️⃣ Store-wise Sales (Total / Average Per Day)
+    # 1️⃣ Store-wise Sales (Filtered Month)
     # =================================================
     st.subheader("🏪 Store-wise Sales")
 
@@ -1218,7 +1239,8 @@ elif section == "📊 Sales Analytics":
 
     if metric_type == "Total":
         store_df = (
-            df.groupby("Store", as_index=False)["Cash Total"]
+            filtered_df
+            .groupby("Store", as_index=False)["Cash Total"]
             .sum()
             .rename(columns={"Cash Total": "Total Sales"})
             .sort_values("Total Sales", ascending=False)
@@ -1228,7 +1250,8 @@ elif section == "📊 Sales Analytics":
 
     else:
         daily_store_sales = (
-            df.groupby(["date_only", "Store"], as_index=False)["Cash Total"]
+            filtered_df
+            .groupby(["date_only", "Store"], as_index=False)["Cash Total"]
             .sum()
         )
 
@@ -1247,27 +1270,16 @@ elif section == "📊 Sales Analytics":
     st.markdown("---")
 
     # =================================================
-    # 2️⃣ Day-wise Sales (Current Month) + Expense + Profit
+    # 2️⃣ Day-wise Sales + Expense + Profit (Selected Month)
     # =================================================
-    st.subheader("📅 Day-wise Sales (Current Month)")
+    st.subheader("📅 Day-wise Sales")
 
-    month_df = df[
-        (df["year"] == current_year) &
-        (df["month"] == current_month)
-    ]
-
-    if month_df.empty:
-        st.info("No sales data for the current month.")
-        st.stop()
-
-    # ---------- Sales per day & store ----------
     day_store_df = (
-        month_df
+        filtered_df
         .groupby(["date_only", "Store"], as_index=False)["Cash Total"]
         .sum()
     )
 
-    # ---------- Total sales per day ----------
     daily_sales = (
         day_store_df
         .groupby("date_only", as_index=False)["Cash Total"]
@@ -1275,17 +1287,20 @@ elif section == "📊 Sales Analytics":
         .rename(columns={"Cash Total": "Total Sales"})
     )
 
-    # ---------- Expenses per day ----------
-    expense_df["date_only"] = expense_df["datetime"].dt.date
+    if not expense_df.empty:
+        expense_df["date_only"] = expense_df["datetime"].dt.date
 
-    daily_expense = (
-        expense_df
-        .groupby("date_only", as_index=False)["Expense Amount"]
-        .sum()
-        .rename(columns={"Expense Amount": "Total Expense"})
-    )
+        daily_expense = (
+            expense_df[expense_df["month_year"] == selected_month]
+            .groupby("date_only", as_index=False)["Expense Amount"]
+            .sum()
+            .rename(columns={"Expense Amount": "Total Expense"})
+        )
+    else:
+        daily_expense = pd.DataFrame(
+            columns=["date_only", "Total Expense"]
+        )
 
-    # ---------- Merge ----------
     final_df = (
         day_store_df
         .merge(daily_sales, on="date_only", how="left")
@@ -1293,9 +1308,10 @@ elif section == "📊 Sales Analytics":
     )
 
     final_df["Total Expense"] = final_df["Total Expense"].fillna(0)
-    final_df["Profit / Loss"] = final_df["Total Sales"] - final_df["Total Expense"]
+    final_df["Profit / Loss"] = (
+        final_df["Total Sales"] - final_df["Total Expense"]
+    )
 
-    # Show totals only once per date
     for col in ["Total Sales", "Total Expense", "Profit / Loss"]:
         final_df[col] = (
             final_df.groupby("date_only")[col]
@@ -1313,51 +1329,31 @@ elif section == "📊 Sales Analytics":
         "Total Sales",
         "Total Expense",
         "Profit / Loss"
-    ]].sort_values(["Date", "Store"],ascending=False).reset_index(drop=True)
+    ]].sort_values(
+        ["Date", "Store"],
+        ascending=False
+    ).reset_index(drop=True)
 
     st.dataframe(final_df, use_container_width=True)
 
     # =================================================
-    # 3️⃣ MONTHLY SALES vs EXPENSE vs PROFIT / LOSS
+    # 3️⃣ MONTHLY SALES / EXPENSE / PROFIT (All Months)
     # =================================================
     st.markdown("---")
-    st.subheader("📆 Monthly Sales / Expense / Profit")
-    
-    # ---------- SALES (Monthly) ----------
+    st.subheader("📆 Monthly Sales / Expense / Profit (All Time)")
+
     monthly_sales_all = (
         df.groupby(["year", "month"], as_index=False)["Cash Total"]
         .sum()
         .rename(columns={"Cash Total": "Sales"})
     )
-    
-    # ---------- EXPENSES (Monthly) ----------
-    expense_df_all = pd.DataFrame(expense_sheet.get_all_records())
-    
-    if not expense_df_all.empty:
-        expense_df_all["Expense Amount"] = pd.to_numeric(
-            expense_df_all["Expense Amount"], errors="coerce"
-        )
-    
-        expense_df_all["datetime"] = pd.to_datetime(
-            expense_df_all["Date & Time"],
-            format=DATETIME_FMT,
-            errors="coerce"
-        )
-    
-        expense_df_all = expense_df_all.dropna(
-            subset=["datetime", "Expense Amount"]
-        )
-    
-        expense_df_all["year"] = expense_df_all["datetime"].dt.year
-        expense_df_all["month"] = expense_df_all["datetime"].dt.month
-    
-        # ❗ EXCLUDE SAVINGS
-        expense_df_all = expense_df_all[
-            expense_df_all["Category"] != "Savings"
-        ]
-    
+
+    if not expense_df.empty:
+        expense_df["year"] = expense_df["datetime"].dt.year
+        expense_df["month"] = expense_df["datetime"].dt.month
+
         monthly_expense_all = (
-            expense_df_all
+            expense_df
             .groupby(["year", "month"], as_index=False)["Expense Amount"]
             .sum()
             .rename(columns={"Expense Amount": "Expense"})
@@ -1366,8 +1362,7 @@ elif section == "📊 Sales Analytics":
         monthly_expense_all = pd.DataFrame(
             columns=["year", "month", "Expense"]
         )
-    
-    # ---------- MERGE SALES + EXPENSE ----------
+
     monthly_pl = (
         monthly_sales_all
         .merge(
@@ -1376,18 +1371,17 @@ elif section == "📊 Sales Analytics":
             how="left"
         )
     )
-    
+
     monthly_pl["Expense"] = monthly_pl["Expense"].fillna(0)
     monthly_pl["Profit / Loss"] = (
         monthly_pl["Sales"] - monthly_pl["Expense"]
     )
-    
-    # ---------- FORMAT YEAR / MONTH ----------
+
     monthly_pl["Year / Month"] = monthly_pl.apply(
         lambda x: f"{int(x['year'])}-{int(x['month']):02d}",
         axis=1
     )
-    
+
     monthly_pl = monthly_pl[[
         "Year / Month",
         "Sales",
@@ -1397,6 +1391,5 @@ elif section == "📊 Sales Analytics":
         "Year / Month",
         ascending=False
     ).reset_index(drop=True)
-    
-    st.dataframe(monthly_pl, use_container_width=True)
 
+    st.dataframe(monthly_pl, use_container_width=True)
