@@ -990,7 +990,7 @@ elif section == "📈 Attendance Analytics":
     df = pd.DataFrame(records)
 
     # -------------------------------------------------
-    # Date Cleaning (DD/MM/YYYY)
+    # Date Cleaning
     # -------------------------------------------------
     df["date"] = pd.to_datetime(
         df["Date"],
@@ -1003,15 +1003,10 @@ elif section == "📈 Attendance Analytics":
     df["year"] = df["date"].dt.year
     df["month"] = df["date"].dt.month
     df["date_only"] = df["date"].dt.date
-
-    current_year = now.year
-    current_month = now.month
+    df["month_year"] = df["date"].dt.to_period("M")
 
     # -------------------------------------------------
     # Absence Calculation
-    # Morning ✖ = 1 shift
-    # Night ✖ = 1 shift
-    # 2 shifts = 1 leave day
     # -------------------------------------------------
     df["absent_shifts"] = (
         (df["Morning"] == "✖").astype(int) +
@@ -1021,28 +1016,35 @@ elif section == "📈 Attendance Analytics":
     df["leave_days"] = df["absent_shifts"] / 2
 
     # =================================================
-    # 1️⃣ Leave Analysis (Month / Year)
+    # 📅 MONTH-YEAR FILTER (MAIN CONTROL)
     # =================================================
-    st.subheader("📊 Leave Analysis (Days)")
+    st.markdown("### 📅 Select Month")
 
-    view_type = st.radio(
-        "View leave data for:",
-        ["Current Month", "Current Year"],
-        horizontal=True
+    available_months = sorted(
+        df["month_year"].unique(),
+        reverse=True
     )
 
-    if view_type == "Current Month":
-        temp = df[
-            (df["year"] == current_year) &
-            (df["month"] == current_month)
-        ]
-        caption = "Leave days taken per employee (Current Month)"
-    else:
-        temp = df[df["year"] == current_year]
-        caption = "Leave days taken per employee (Current Year)"
+    selected_month = st.selectbox(
+        "Select Month-Year",
+        available_months,
+        format_func=lambda x: x.strftime("%B %Y")
+    )
+
+    filtered_df = df[df["month_year"] == selected_month].copy()
+
+    if filtered_df.empty:
+        st.warning("No attendance data available for selected month.")
+        st.stop()
+
+    # =================================================
+    # 1️⃣ Leave Analysis (Selected Month)
+    # =================================================
+    st.subheader("📊 Leave Analysis (Selected Month)")
 
     leave_df = (
-        temp.groupby("Employee Name", as_index=False)["leave_days"]
+        filtered_df
+        .groupby("Employee Name", as_index=False)["leave_days"]
         .sum()
         .rename(columns={
             "Employee Name": "Employee",
@@ -1052,46 +1054,43 @@ elif section == "📈 Attendance Analytics":
         .reset_index(drop=True)
     )
 
-    st.caption(caption)
     st.dataframe(leave_df, use_container_width=True)
 
     st.markdown("---")
 
     # =================================================
-    # 2️⃣ Shift-wise Absentee Breakdown
+    # 2️⃣ Shift-wise Absentee Breakdown (Selected Month)
     # =================================================
     st.subheader("⏰ Shift-wise Absentee Breakdown")
 
     shift_df = pd.DataFrame([
-        {"Shift": "Morning", "Absent Count": (df["Morning"] == "✖").sum()},
-        {"Shift": "Night", "Absent Count": (df["Night"] == "✖").sum()},
+        {
+            "Shift": "Morning",
+            "Absent Count": (filtered_df["Morning"] == "✖").sum()
+        },
+        {
+            "Shift": "Night",
+            "Absent Count": (filtered_df["Night"] == "✖").sum()
+        },
     ]).sort_values("Absent Count", ascending=False).reset_index(drop=True)
 
-    st.caption("Total absentees per shift (all time)")
     st.dataframe(shift_df, use_container_width=True)
 
     st.markdown("---")
 
     # =================================================
-    # 3️⃣ Day-wise Absentees by Shift (CURRENT MONTH ONLY)
+    # 3️⃣ Day-wise Absentees (Selected Month)
     # =================================================
-    st.subheader("📋 Day-wise Absentees by Shift (Current Month)")
-    
-    # Filter to current month ONLY
-    month_df = df[
-        (df["year"] == current_year) &
-        (df["month"] == current_month)
-    ]
-    
+    st.subheader("📋 Day-wise Absentees (Selected Month)")
+
     rows = []
-    
-    for day, day_df in month_df.groupby("date_only"):
-    
-        # Morning absentees
+
+    for day, day_df in filtered_df.groupby("date_only"):
+
         morning_absent = day_df.loc[
             day_df["Morning"] == "✖", "Employee Name"
         ].tolist()
-    
+
         if morning_absent:
             rows.append({
                 "Date": day.strftime(DATE_FMT),
@@ -1099,12 +1098,11 @@ elif section == "📈 Attendance Analytics":
                 "Absent Count": len(morning_absent),
                 "Absent Employees": ", ".join(morning_absent)
             })
-    
-        # Night absentees
+
         night_absent = day_df.loc[
             day_df["Night"] == "✖", "Employee Name"
         ].tolist()
-    
+
         if night_absent:
             rows.append({
                 "Date": day.strftime(DATE_FMT),
@@ -1112,17 +1110,66 @@ elif section == "📈 Attendance Analytics":
                 "Absent Count": len(night_absent),
                 "Absent Employees": ", ".join(night_absent)
             })
-    
+
     if rows:
         abs_df = (
             pd.DataFrame(rows)
-            .sort_values(["Date", "Shift"],ascending=False)
+            .sort_values(["Date", "Shift"], ascending=False)
             .reset_index(drop=True)
         )
         st.dataframe(abs_df, use_container_width=True)
     else:
-        st.info("No absentees recorded for the current month.")
+        st.info("No absentees recorded for selected month.")
 
+    st.markdown("---")
+
+    # =================================================
+    # 📅 DATE FILTER SECTION (SHOW ONLY ABSENTEES)
+    # =================================================
+    st.subheader("📅 View Absentees for a Specific Date")
+
+    available_dates = sorted(
+        filtered_df["date_only"].unique(),
+        reverse=True
+    )
+
+    selected_date = st.selectbox(
+        "Select Date",
+        available_dates,
+        format_func=lambda x: x.strftime(DATE_FMT)
+    )
+
+    day_df = filtered_df[filtered_df["date_only"] == selected_date]
+
+    morning_absent = day_df.loc[
+        day_df["Morning"] == "✖", "Employee Name"
+    ].tolist()
+
+    night_absent = day_df.loc[
+        day_df["Night"] == "✖", "Employee Name"
+    ].tolist()
+
+    result_rows = []
+
+    if morning_absent:
+        result_rows.append({
+            "Shift": "Morning",
+            "Absent Count": len(morning_absent),
+            "Absent Employees": ", ".join(morning_absent)
+        })
+
+    if night_absent:
+        result_rows.append({
+            "Shift": "Night",
+            "Absent Count": len(night_absent),
+            "Absent Employees": ", ".join(night_absent)
+        })
+
+    if result_rows:
+        result_df = pd.DataFrame(result_rows)
+        st.dataframe(result_df, use_container_width=True)
+    else:
+        st.success("🎉 No absentees on this date.")
 
 # =================================================
 # 📊 SALES ANALYTICS
@@ -1393,3 +1440,4 @@ elif section == "📊 Sales Analytics":
     ).reset_index(drop=True)
 
     st.dataframe(monthly_pl, use_container_width=True)
+
