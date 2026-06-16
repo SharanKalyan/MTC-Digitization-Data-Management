@@ -2,7 +2,6 @@
 
 ## Project Context
 
-
 This project began when a restaurant (SMB) owner approached me with a common but critical problem:
 
 All sales, expenses, and employee attendance were being written manually in notebooks.
