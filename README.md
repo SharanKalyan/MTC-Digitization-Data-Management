@@ -38,6 +38,7 @@ The solution is a Streamlit-based web application backed by Google Sheets as a l
 
 Why this stack?
 
+
 | Component                | Reason                                                   |
 | ------------------------ | -------------------------------------------------------- |
 | **Streamlit**            | Rapid UI development, mobile-friendly, simple deployment |
