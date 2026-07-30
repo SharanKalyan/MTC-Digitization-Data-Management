@@ -2,7 +2,7 @@
 
 ## Project Context
 
-This project began when a restaurant (SMB) owner approached me with a common but critical problem:
+This project began when the owner of a restaurant (SMB) approached me with a common but critical problem:
 
 All sales, expenses, and employee attendance were being written manually in notebooks.
 There was no visibility into daily performance, profits, or cash position, only handwritten records.
