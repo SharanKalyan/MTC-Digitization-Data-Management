@@ -24,7 +24,6 @@ This project is the result of that initiative. A full digital data entry + analy
 https://www.google.com/maps/place/monisha+tiffin+centre/data=!4m2!3m1!1s0x3a52662014ac5a59:0xfdde7cced4ca755c?sa=X&ved=1t:242&ictx=111
 
 ## Objectives
-
 The primary goals of this system were:
 - Digitize daily operational data entry
 - Minimize user friction (large buttons, mobile-first UI)
