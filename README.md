@@ -9,6 +9,7 @@ As the business grew, this manual process became:
 
 - Error-prone
 - Time-consuming
+
 - Impossible to analyze
 - Completely disconnected from decision-making
 
