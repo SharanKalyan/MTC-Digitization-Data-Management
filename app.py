@@ -167,7 +167,6 @@ section = st.selectbox(
         "📊 Today's Summary",
         "🧾 Expense Entry",
         "💰 Sales Entry",
-        "👤 Employee Salary",
         "🧑‍🍳 Attendance",
         "📊 Expense Analytics",
         "📈 Attendance Analytics",
@@ -663,9 +662,8 @@ elif section == "🧑‍🍳 Attendance":
     st.markdown("## 🧑‍🍳 Attendance")
 
     EMPLOYEES = [
-        "Vinoth","Ravi","Mani","Ansari","Kumar","Sakthi","Vijaya","Hari",
-        "Samuthuram","Ramesh","Punitha","Vembu","Babu","Latha",
-        "Indhra","Ambika","RY","YS","Poosari","Balaji"
+        "Vinoth","Ravi","Mani","Ansari","Kumar","Vijaya","Hari",
+        "Samuthuram","Punitha","Vembu","Balaji","Mahesh","Employee1","employee2"
     ]
 
     att_date = st.date_input(
@@ -1440,4 +1438,3 @@ elif section == "📊 Sales Analytics":
     ).reset_index(drop=True)
 
     st.dataframe(monthly_pl, use_container_width=True)
-
